@@ -11,7 +11,7 @@ if (supabaseUrl.includes('your-supabase-url') || supabaseAnonKey.includes('your-
   throw new Error('Please replace placeholder values in .env.local with actual Supabase credentials.')
 }
 
-// Simple, working client configuration
+// Optimized but stable client configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false,
@@ -20,10 +20,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   realtime: {
     params: {
-      eventsPerSecond: 50
+      eventsPerSecond: 50 // High activity support
+    }
+  },
+  global: {
+    headers: {
+      'Cache-Control': 'no-cache' // Ensure fresh data
     }
   }
 })
+
+// Performance monitoring helper
+export const trackQuery = (operationName: string, startTime: number) => {
+  const duration = Date.now() - startTime
+  if (duration > 500) { // Log queries >500ms
+    console.warn(`🐌 SLOW QUERY: ${operationName} took ${duration}ms`)
+  }
+  return duration
+}
 
 export type Database = {
   public: {
