@@ -13,7 +13,7 @@ export function Footer() {
               className="h-5 w-auto"
             />
             <span className="font-medium text-[var(--foreground)]">
-              Pump.fun Creator Rewards
+              Launchcoin creator rewards
             </span>
           </div>
         </div>
