@@ -79,44 +79,59 @@ export function WalletButton() {
   if (showWalletList && !connected) {
     return (
       <div className="relative">
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-[var(--card)] rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm sm:w-auto border-t sm:border border-[var(--border)] max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h3 className="text-base sm:text-lg font-semibold text-[var(--card-foreground)]">
+        <button
+          onClick={handleConnect}
+          className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-sm font-medium"
+        >
+          <Wallet size={12} className="sm:w-4 sm:h-4" />
+          <span className="text-xs sm:text-sm">Connect Wallet</span>
+        </button>
+
+        {/* Dropdown wallet list */}
+        <div className="absolute top-full right-0 mt-2 w-64 sm:w-72 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg z-[9999] max-h-80 overflow-y-auto">
+          <div className="p-4 border-b border-[var(--border)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[var(--card-foreground)]">
                 Choose Wallet
               </h3>
               <button
                 onClick={() => setShowWalletList(false)}
-                className="p-2 rounded-lg hover:bg-[var(--accent)] text-[var(--foreground)] transition-colors"
+                className="p-1 rounded-lg hover:bg-[var(--accent)] text-[var(--foreground)] transition-colors"
               >
                 <span className="text-lg">✕</span>
               </button>
             </div>
-            <div className="space-y-3">
-              {wallets.map((wallet) => (
-                <button
-                  key={wallet.adapter.name}
-                  onClick={() => handleWalletSelect(wallet.adapter.name)}
-                  className="w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition-colors text-left"
-                >
-                  <img 
-                    src={wallet.adapter.icon} 
-                    alt={wallet.adapter.name}
-                    className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0"
-                  />
-                  <span className="font-medium text-sm sm:text-base text-[var(--card-foreground)]">
-                    {wallet.adapter.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-[var(--border)] text-center">
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Select a wallet to connect to Likers
-              </p>
-            </div>
+          </div>
+          <div className="p-2">
+            {wallets.map((wallet) => (
+              <button
+                key={wallet.adapter.name}
+                onClick={() => handleWalletSelect(wallet.adapter.name)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--accent)] transition-colors text-left"
+              >
+                <img 
+                  src={wallet.adapter.icon} 
+                  alt={wallet.adapter.name}
+                  className="w-6 h-6 flex-shrink-0"
+                />
+                <span className="font-medium text-sm text-[var(--card-foreground)]">
+                  {wallet.adapter.name}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="p-3 border-t border-[var(--border)] text-center">
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Select a wallet to connect
+            </p>
           </div>
         </div>
+
+        {/* Click outside to close */}
+        <div 
+          className="fixed inset-0 z-[9998]" 
+          onClick={() => setShowWalletList(false)}
+        />
       </div>
     )
   }
