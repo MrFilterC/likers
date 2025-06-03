@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
-import { monitorAsyncOperation } from '@/lib/monitoring'
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  
   try {
     // Rate limiting check
     const rateLimitResult = rateLimit(request, RATE_LIMITS.VOTE)
@@ -35,8 +36,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get or create user with monitoring
-    const userId = await monitorAsyncOperation(async () => {
+    // Get or create user - simplified
+    let userId: string
+    
+    try {
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -44,92 +47,134 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (existingUser) {
-        return existingUser.id
+        userId = existingUser.id
+      } else {
+        const { data: newUser, error: userError } = await supabase
+          .from('users')
+          .insert({ wallet_address: walletAddress })
+          .select('id')
+          .single()
+
+        if (userError) {
+          console.error('User creation error:', userError)
+          return NextResponse.json(
+            { error: 'Failed to create user: ' + userError.message },
+            { status: 500 }
+          )
+        }
+        
+        userId = newUser.id
       }
+    } catch (error) {
+      console.error('User lookup/creation error:', error)
+      return NextResponse.json(
+        { error: 'Database error during user handling' },
+        { status: 500 }
+      )
+    }
 
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert({ wallet_address: walletAddress })
-        .select('id')
-        .single()
+    // Check for existing vote first
+    const { data: existingVote } = await supabase
+      .from('votes')
+      .select('id, vote_type')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .single()
 
-      if (userError) {
-        console.error('User creation error:', userError)
-        throw new Error('Failed to create user')
-      }
-      
-      return newUser.id
-    }, 'create-user-vote')
-
-    // Check for existing vote and create new vote in parallel
-    const [existingVoteCheck, newVote] = await Promise.all([
-      supabase
-        .from('votes')
-        .select('id, vote_type')
-        .eq('post_id', postId)
-        .eq('user_id', userId)
-        .single(),
-      
-      supabase
-        .from('votes')
-        .insert({
-          post_id: postId,
-          user_id: userId,
-          vote_type: voteType,
-          round_id: roundId
-        })
-        .select()
-        .single()
-    ])
-
-    // Handle existing vote
-    if (existingVoteCheck.data) {
+    if (existingVote) {
       return NextResponse.json(
         { error: 'You have already voted on this post' },
         { status: 400 }
       )
     }
 
-    // Handle vote creation error
-    if (newVote.error) {
-      if (newVote.error.code === '23505') { // Unique constraint
+    // Create new vote
+    const { data: newVote, error: voteError } = await supabase
+      .from('votes')
+      .insert({
+        post_id: postId,
+        user_id: userId,
+        vote_type: voteType,
+        round_id: roundId
+      })
+      .select()
+      .single()
+
+    if (voteError) {
+      console.error('Vote creation error:', voteError)
+      if (voteError.code === '23505') { // Unique constraint
         return NextResponse.json(
           { error: 'You have already voted on this post' },
           { status: 400 }
         )
       }
-      console.error('Vote creation error:', newVote.error)
       return NextResponse.json(
-        { error: 'Failed to record vote' },
+        { error: 'Failed to record vote: ' + voteError.message },
         { status: 500 }
       )
     }
 
-    // Update post vote counts
-    const updateResult = await monitorAsyncOperation(async () => {
-      if (voteType === 'upvote') {
-        return await supabase.rpc('increment_upvotes', { post_id: postId })
-      } else {
-        return await supabase.rpc('increment_downvotes', { post_id: postId })
+    // Update post vote counts - simple approach
+    try {
+      // Get current post data first
+      const { data: currentPost } = await supabase
+        .from('posts')
+        .select('upvotes, downvotes')
+        .eq('id', postId)
+        .single()
+        
+      if (currentPost) {
+        if (voteType === 'upvote') {
+          const { error: updateError } = await supabase
+            .from('posts')
+            .update({ 
+              upvotes: currentPost.upvotes + 1 
+            })
+            .eq('id', postId)
+            
+          if (updateError) {
+            console.warn('Failed to update upvote count:', updateError.message)
+          }
+        } else {
+          const { error: updateError } = await supabase
+            .from('posts')
+            .update({ 
+              downvotes: currentPost.downvotes + 1 
+            })
+            .eq('id', postId)
+            
+          if (updateError) {
+            console.warn('Failed to update downvote count:', updateError.message)
+          }
+        }
       }
-    }, 'update-vote-count')
+    } catch (error) {
+      console.warn('Vote count update failed:', error)
+      // Don't fail the request
+    }
 
-    if (updateResult.error) {
-      console.error('Vote count update error:', updateResult.error)
-      // Don't fail the request, just log the error
+    // Performance logging
+    const duration = Date.now() - startTime
+    if (duration > 1000) {
+      console.warn(`🐌 SLOW VOTE API: ${duration}ms`, { userId, postId })
     }
     
     return NextResponse.json({ 
       success: true, 
-      vote: newVote.data,
+      vote: newVote,
       rateLimit: {
         remaining: rateLimitResult.remaining,
         reset: rateLimitResult.reset
+      },
+      performance: {
+        duration: duration + 'ms'
       }
     })
     
   } catch (error) {
-    console.error('Vote creation error:', error)
+    const duration = Date.now() - startTime
+    console.error(`❌ VOTE API ERROR (${duration}ms):`, error)
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
