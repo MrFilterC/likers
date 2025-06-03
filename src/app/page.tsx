@@ -582,28 +582,39 @@ export default function Home() {
     const userKey = publicKey.toString()
     logger.debug('Setting up presence for user:', userKey)
 
-    // Join presence channel
+    // Join presence channel with throttling
     const presenceChannel = supabase.channel('online_users', {
       config: {
         presence: {
           key: userKey,
         },
+        broadcast: { self: false }, // Don't receive our own broadcasts
+        postgres_changes: { enabled: false }, // Disable if not needed for presence
       },
     })
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
+    // Throttle presence updates
+    let presenceTimeout: NodeJS.Timeout | null = null
+    const throttledPresenceUpdate = () => {
+      if (presenceTimeout) clearTimeout(presenceTimeout)
+      presenceTimeout = setTimeout(() => {
         const newState = presenceChannel.presenceState()
         const users = Object.keys(newState).length
         logger.debug('Online users:', users)
         setOnlineUsers(users)
         setConnectionStatus('online')
-      })
+      }, 500) // 500ms throttle
+    }
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, throttledPresenceUpdate)
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         logger.debug(' User joined:', key)
+        throttledPresenceUpdate()
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         logger.debug('User left:', key)
+        throttledPresenceUpdate()
       })
       .subscribe(async (status) => {
         logger.debug('Presence subscription status:', status)
@@ -619,6 +630,7 @@ export default function Home() {
       })
 
     return () => {
+      if (presenceTimeout) clearTimeout(presenceTimeout)
       presenceChannel.unsubscribe()
     }
   }, [connected, publicKey])

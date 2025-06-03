@@ -32,33 +32,36 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Get user ID
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('wallet_address', walletAddress)
-      .single()
+    // Get user ID and post data in parallel for better performance
+    const [userResult, postResult] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', walletAddress)
+        .single(),
+      supabase
+        .from('posts')
+        .select('round_id, user_id')
+        .eq('id', postId)
+        .single()
+    ])
 
-    if (!userData) {
+    if (!userResult.data) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       )
     }
-    
-    // Verify post belongs to current round
-    const { data: postData } = await supabase
-      .from('posts')
-      .select('round_id, user_id')
-      .eq('id', postId)
-      .single()
 
-    if (!postData) {
+    if (!postResult.data) {
       return NextResponse.json(
         { error: 'Post not found' },
         { status: 404 }
       )
     }
+    
+    const userData = userResult.data
+    const postData = postResult.data
     
     if (postData.round_id !== roundId) {
       return NextResponse.json(
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('post_id', postId)
       .eq('user_id', userData.id)
-      .single()
+      .maybeSingle() // Use maybeSingle instead of single to handle no results gracefully
 
     let isNewVote = false
     

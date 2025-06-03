@@ -11,7 +11,22 @@ if (supabaseUrl.includes('your-supabase-url') || supabaseAnonKey.includes('your-
   throw new Error('Please replace placeholder values in .env.local with actual Supabase credentials.')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Optimized client for high concurrency
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false, // Disable auth sessions for better performance
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 50, // Increased event rate for high activity
+    },
+  },
+  global: {
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
+  },
+})
 
 export type Database = {
   public: {

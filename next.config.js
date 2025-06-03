@@ -13,6 +13,28 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Performance optimizations for high concurrency
+  experimental: {
+    optimizeCss: true,
+  },
+  // External packages for server components (moved from experimental)
+  serverExternalPackages: ['@supabase/supabase-js'],
+  // Enable compression
+  compress: true,
+  // Optimize output
+  output: 'standalone',
+  // Reduce bundle size
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      }
+    }
+    return config
+  },
   async headers() {
     return [
       {
@@ -43,6 +65,16 @@ const nextConfig = {
           {
             key: 'Content-Type',
             value: 'application/manifest+json',
+          },
+        ],
+      },
+      // API Routes cache headers
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
           },
         ],
       },
