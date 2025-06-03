@@ -119,9 +119,9 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
             </div>
             <div className="space-y-3 text-[var(--card-foreground)]">
               <p><strong>• One post per round.</strong> Got something to say? Drop a single post (max 140 characters) each round.</p>
-              <p><strong>• Vote it out.</strong> During the 60-second round, posts go head-to-head. Like or dislike others in real-time.</p>
+              <p><strong>• Vote it out.</strong> During the 10-minute round, posts go head-to-head. Like or dislike others in real-time.</p>
               <p><strong>• Most liked = Winner.</strong> At the end of each round, the most liked post wins – automatically.</p>
-              <p><strong>• Earn what the round generates.</strong> All creator fee rewards generated during the round (from trading $Likers on Pump.fun) are claimed by the creator wallet and sent directly to the winner's wallet.</p>
+              <p><strong>• Earn what the round generates.</strong> All creator fee rewards generated during the round (from trading $Likers on believe.app) are claimed by the creator wallet and sent directly to the winner's wallet.</p>
               <p><strong>• Join with your wallet.</strong> Connect your Solana wallet to participate. No worries – it's just a signature to verify ownership. No approvals. No risks. Burner wallets are totally fine!</p>
               <p><strong>• New round, new chance.</strong> When a round ends, a new one begins – and rewards keep flowing. Forever.</p>
             </div>
