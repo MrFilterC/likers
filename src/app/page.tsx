@@ -242,8 +242,8 @@ export default function Home() {
         logger.debug('Active round end time:', activeRound.end_time, 'vs now:', now.toISOString())
         logger.debug('Time until end:', timeUntilEnd, 'ms')
         
-        // If round ended less than 30 seconds ago, we're in preparation mode
-        const isInPreparationFromDB = timeUntilEnd <= 0 && timeUntilEnd > -30000 // -30 seconds
+        // If round ended less than 2 minutes ago, we're in preparation mode
+        const isInPreparationFromDB = timeUntilEnd <= 0 && timeUntilEnd > -120000 // -2 minutes
         
         if (timeUntilEnd > 0) {
           // Round is still active and running
@@ -266,8 +266,8 @@ export default function Home() {
           setCurrentRoundId(activeRound.id) // Keep same round ID during preparation
           setCurrentRoundEnd(roundEndTime)
           setPreparationMode(true)
-          // Calculate preparation end time (30 seconds after round end)
-          const prepEnd = new Date(roundEndTime.getTime() + 30 * 1000)
+          // Calculate preparation end time (2 minutes after round end)
+          const prepEnd = new Date(roundEndTime.getTime() + 120 * 1000) // Changed from 30 to 120 seconds
           setPreparationEnd(prepEnd)
           if (activeRound.round_number) {
             setRoundNumber(activeRound.round_number)
@@ -303,7 +303,7 @@ export default function Home() {
           }
           return
         } else {
-          // Round ended more than 30 seconds ago, mark as server ended and create new
+          // Round ended more than 2 minutes ago, mark as server ended and create new
           logger.debug('Active round preparation expired, ending:', activeRound.id)
           await supabase
             .from('rounds')
@@ -330,7 +330,7 @@ export default function Home() {
     try {
       logger.debug('Creating new round #', roundNumber)
       const startTime = new Date()
-      const endTime = new Date(startTime.getTime() + 60 * 1000) // 60 seconds
+      const endTime = new Date(startTime.getTime() + 600 * 1000) // Changed from 60 to 600 seconds (10 minutes)
 
       const { data: newRound, error: createError } = await supabase
         .from('rounds')
@@ -346,7 +346,7 @@ export default function Home() {
       if (createError) {
         logger.error('Error creating round:', createError)
         // Fallback to mock data if database fails
-        setCurrentRoundEnd(new Date(Date.now() + 60 * 1000))
+        setCurrentRoundEnd(new Date(Date.now() + 600 * 1000)) // Changed from 60 to 600 seconds
         setRoundNumber(roundNumber)
         return
       }
@@ -359,7 +359,7 @@ export default function Home() {
       setPreparationEnd(null)
     } catch (error) {
       logger.error('Error creating next round:', error)
-      setCurrentRoundEnd(new Date(Date.now() + 60 * 1000))
+      setCurrentRoundEnd(new Date(Date.now() + 600 * 1000)) // Changed from 60 to 600 seconds
     }
   }
 
@@ -775,7 +775,7 @@ export default function Home() {
       
       // Start preparation mode immediately
       setPreparationMode(true)
-      const prepEnd = new Date(Date.now() + 30 * 1000) // 30 seconds preparation
+      const prepEnd = new Date(Date.now() + 120 * 1000) // Changed from 30 to 120 seconds (2 minutes)
       setPreparationEnd(prepEnd)
       
       // Clear posts immediately to prevent confusion
@@ -888,7 +888,7 @@ export default function Home() {
         
         // Reload leaderboard to show new winner
         await loadLeaderboard()
-      }, 30 * 1000) // 30 seconds preparation time
+      }, 120 * 1000) // Changed from 30 to 120 seconds (2 minutes)
       
     } catch (error) {
       logger.error('Error handling round end:', error)
@@ -1091,7 +1091,7 @@ export default function Home() {
               <CountdownTimer 
                 endTime={currentRoundEnd} 
                 onTimeUp={handleTimeUp}
-                label="Time remaining"
+                label="Round remaining"
               />
             </div>
           </div>
