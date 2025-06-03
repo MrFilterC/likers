@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Likers
 
-## Getting Started
+A real-time social voting platform where users submit creative content, vote on posts, and win rewards using Solana blockchain.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Real-time Voting**: Submit posts and vote on community content
+- **60-second Rounds**: Dynamic round-based gameplay 
+- **One Post Per Round**: Strategic submission system
+- **Solana Integration**: Connect with Phantom, Solflare and other Solana wallets
+- **Dark/Light Theme**: Beautiful UI with theme toggle
+- **Admin Panel**: Manage winners and reward distribution
+- **Leaderboard**: Track top performers and prizes
+- **Live Rankings**: Real-time post ranking with visual indicators
+- **Smart Notifications**: Post status and user feedback system
+
+## Tech Stack
+
+- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS
+- **Blockchain**: Solana Web3.js, Wallet Adapter
+- **Database**: Supabase (PostgreSQL) with real-time subscriptions
+- **UI Components**: Lucide React icons
+- **Theme**: next-themes
+
+## Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create `.env.local` file:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_ADMIN_WALLET_ADDRESS=your_admin_wallet_address
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000)
+
+## Database Schema
+
+The app uses Supabase with the following tables:
+
+- `users`: Store wallet addresses
+- `posts`: Store user submissions (one per user per round)
+- `votes`: Track upvotes/downvotes with real-time updates
+- `rounds`: Manage 60-second rounds with winner tracking
+- `leaderboard`: Store winners and prize information
+
+### Database Constraints
+
+Run this SQL in Supabase to ensure data integrity:
+
+```sql
+ALTER TABLE posts ADD CONSTRAINT unique_user_post_per_round 
+UNIQUE (user_id, round_id);
+
+ALTER TABLE leaderboard ADD CONSTRAINT unique_post_id_leaderboard 
+UNIQUE (post_id);
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Admin Panel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Access the admin panel at `/admin` with the configured admin wallet address to:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Select round winners from current posts
+- Add prize amounts and transaction hashes
+- Edit and manage leaderboard entries
+- Monitor live voting activity
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+1. Users connect their Solana wallet to join Likers
+2. Submit ONE creative post per round (max 140 characters)
+3. Community votes during 60-second rounds
+4. Post with highest net score (upvotes - downvotes) wins
+5. Admin sends SOL rewards and records transactions
+6. Winners appear on the public leaderboard
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Key Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Real-time Experience
+- Live vote counting and ranking updates
+- Instant post status feedback
+- Server-side winner determination for consistency
+- Race condition protection
 
-## Deploy on Vercel
+### Smart UI/UX
+- Color-coded posts based on performance (green/red/gray borders)
+- Top 3 posts highlighted with ranking badges
+- "Mine" indicators for user's own posts
+- Mobile-responsive design
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Development Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Server-side winner determination prevents inconsistencies
+- Real-time Supabase subscriptions for live updates
+- Graceful handling of race conditions
+- 60-second rounds optimized for engagement
+- Comprehensive error handling and logging
