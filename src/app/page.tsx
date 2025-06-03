@@ -94,7 +94,14 @@ export default function Home() {
 
       logger.debug('loadPosts: Raw data received:', postsData?.length || 0, 'posts')
 
-      const formattedPosts: Post[] = postsData?.map((post: any) => ({
+      const formattedPosts: Post[] = postsData?.map((post: {
+        id: string;
+        content: string;
+        upvotes: number;
+        downvotes: number;
+        created_at: string;
+        users: { wallet_address: string };
+      }) => ({
         id: post.id,
         content: post.content,
         author: post.users.wallet_address,
@@ -169,7 +176,14 @@ export default function Home() {
 
       if (error) throw error
 
-      const formattedLeaderboard: LeaderboardEntry[] = data?.map((entry: any) => ({
+      const formattedLeaderboard: LeaderboardEntry[] = data?.map((entry: {
+        id: string;
+        amount: number;
+        transaction_hash: string;
+        created_at: string;
+        users: { wallet_address: string };
+        posts: { content: string; upvotes: number; downvotes: number };
+      }) => ({
         id: entry.id,
         winner: entry.users.wallet_address,
         post: entry.posts.content,
@@ -387,7 +401,7 @@ export default function Home() {
             
             // If we have a round_id in the payload, check if it matches current round
             if (payload.new && typeof payload.new === 'object' && 'round_id' in payload.new && payload.eventType === 'INSERT') {
-              const payloadRoundId = (payload.new as any).round_id
+              const payloadRoundId = (payload.new as { round_id: string }).round_id
               
               // Don't process any posts during preparation mode
               if (preparationMode) {
