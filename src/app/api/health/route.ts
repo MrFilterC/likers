@@ -3,14 +3,13 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Simple database test
+    // Test database connection
     const { data, error } = await supabase
-      .from('users')
+      .from('rounds')
       .select('id')
       .limit(1)
 
     if (error) {
-      console.error('Health check database error:', error)
       return NextResponse.json(
         { 
           status: 'error', 
@@ -21,15 +20,15 @@ export async function GET() {
       )
     }
 
+    // Test successful
     return NextResponse.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       database: 'connected',
-      uptime: process.uptime ? Math.round(process.uptime()) : 'unknown'
+      uptime: process.uptime()
     })
 
   } catch (error) {
-    console.error('Health check error:', error)
     return NextResponse.json(
       { 
         status: 'error', 

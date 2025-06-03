@@ -11,32 +11,50 @@ if (supabaseUrl.includes('your-supabase-url') || supabaseAnonKey.includes('your-
   throw new Error('Please replace placeholder values in .env.local with actual Supabase credentials.')
 }
 
-// Optimized but stable client configuration
+// Optimized client for high concurrency
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: {
+    schema: 'public'
+  },
   auth: {
-    persistSession: false,
     autoRefreshToken: false,
+    persistSession: false,
     detectSessionInUrl: false
   },
   realtime: {
     params: {
-      eventsPerSecond: 50 // High activity support
+      eventsPerSecond: 50
     }
   },
   global: {
+    fetch: (...args) => fetch(...args),
     headers: {
-      'Cache-Control': 'no-cache' // Ensure fresh data
+      'Connection': 'keep-alive',
+      'Keep-Alive': 'timeout=60'
     }
   }
 })
 
-// Performance monitoring helper
-export const trackQuery = (operationName: string, startTime: number) => {
-  const duration = Date.now() - startTime
-  if (duration > 500) { // Log queries >500ms
-    console.warn(`🐌 SLOW QUERY: ${operationName} took ${duration}ms`)
-  }
-  return duration
+// Connection pool monitoring
+export const createOptimizedClient = () => {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: 'public'
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    },
+    global: {
+      fetch: (...args) => fetch(...args),
+      headers: {
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=60',
+        'Cache-Control': 'no-cache'
+      }
+    }
+  })
 }
 
 export type Database = {
