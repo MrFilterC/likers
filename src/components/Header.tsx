@@ -30,13 +30,16 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
     <>
       <header className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--background)] backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/60">
         <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Logo - Clickable */}
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          {/* Logo + Text - Clickable */}
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
             <img 
               src="/likers.png" 
               alt="Likers" 
-              className="h-8 sm:h-10 w-auto"
+              className="h-10 sm:h-12 w-auto"
             />
+            <span className="text-lg sm:text-xl font-bold text-[var(--foreground)]">
+              $LIKERS
+            </span>
           </Link>
 
           {/* Center - How it works */}
