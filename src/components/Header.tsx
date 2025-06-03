@@ -29,30 +29,30 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--background)] backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/60">
-        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 lg:px-8">
           {/* Logo + Text - Clickable */}
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-3 hover:opacity-80 transition-opacity flex-shrink-0">
             <img 
               src="/likers.png" 
               alt="Likers" 
-              className="h-10 sm:h-12 w-auto"
+              className="h-8 sm:h-12 w-auto"
             />
-            <span className="text-lg sm:text-xl font-bold text-[var(--foreground)]">
+            <span className="text-sm sm:text-xl font-bold text-[var(--foreground)] whitespace-nowrap">
               $LIKERS
             </span>
           </Link>
 
-          {/* Center - How it works */}
+          {/* Center - How it works - Smaller on mobile */}
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--muted)] text-[var(--accent-foreground)] transition-colors"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--muted)] text-[var(--accent-foreground)] transition-colors flex-shrink-0"
           >
-            <HelpCircle size={14} className="sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">How it works</span>
+            <HelpCircle size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Help</span>
           </button>
 
           {/* Right side - Theme toggle + Status + Wallet */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-4 flex-shrink-0">
             {/* Connection Status & Online Users */}
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
@@ -79,7 +79,7 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
             </div>
 
             {/* Mobile status - simplified */}
-            <div className="sm:hidden flex items-center">
+            <div className="sm:hidden flex items-center mr-1">
               <div className={`w-2 h-2 rounded-full ${
                 connectionStatus === 'online' ? 'bg-green-500' : 
                 connectionStatus === 'offline' ? 'bg-red-500' : 
@@ -89,13 +89,13 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
 
             <button
               onClick={toggleTheme}
-              className="p-1.5 sm:p-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--muted)] text-[var(--accent-foreground)] transition-colors"
+              className="p-1 sm:p-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--muted)] text-[var(--accent-foreground)] transition-colors"
               aria-label="Toggle theme"
             >
               {mounted ? (
-                theme === 'dark' ? <Sun size={16} className="sm:w-5 sm:h-5" /> : <Moon size={16} className="sm:w-5 sm:h-5" />
+                theme === 'dark' ? <Sun size={14} className="sm:w-5 sm:h-5" /> : <Moon size={14} className="sm:w-5 sm:h-5" />
               ) : (
-                <div className="w-4 h-4 sm:w-5 sm:h-5" /> // Placeholder to prevent layout shift
+                <div className="w-3.5 h-3.5 sm:w-5 sm:h-5" /> // Placeholder to prevent layout shift
               )}
             </button>
             
