@@ -11,51 +11,19 @@ if (supabaseUrl.includes('your-supabase-url') || supabaseAnonKey.includes('your-
   throw new Error('Please replace placeholder values in .env.local with actual Supabase credentials.')
 }
 
-// Optimized client for high concurrency
+// Simple, working client configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: {
-    schema: 'public'
-  },
   auth: {
-    autoRefreshToken: false,
     persistSession: false,
+    autoRefreshToken: false,
     detectSessionInUrl: false
   },
   realtime: {
     params: {
       eventsPerSecond: 50
     }
-  },
-  global: {
-    fetch: (...args) => fetch(...args),
-    headers: {
-      'Connection': 'keep-alive',
-      'Keep-Alive': 'timeout=60'
-    }
   }
 })
-
-// Connection pool monitoring
-export const createOptimizedClient = () => {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    db: {
-      schema: 'public'
-    },
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    },
-    global: {
-      fetch: (...args) => fetch(...args),
-      headers: {
-        'Connection': 'keep-alive',
-        'Keep-Alive': 'timeout=60',
-        'Cache-Control': 'no-cache'
-      }
-    }
-  })
-}
 
 export type Database = {
   public: {

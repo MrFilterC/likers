@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
-import { monitorAsyncOperation } from '@/lib/monitoring'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,18 +34,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get or create user with monitoring
-    const userId = await monitorAsyncOperation(async () => {
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', walletAddress)
-        .single()
+    // Get or create user - simple approach
+    let userId: string
+    
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('wallet_address', walletAddress)
+      .single()
 
-      if (existingUser) {
-        return existingUser.id
-      }
-
+    if (existingUser) {
+      userId = existingUser.id
+    } else {
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert({ wallet_address: walletAddress })
@@ -55,58 +54,58 @@ export async function POST(request: NextRequest) {
 
       if (userError) {
         console.error('User creation error:', userError)
-        throw new Error('Failed to create user')
+        return NextResponse.json(
+          { error: 'Failed to create user: ' + userError.message },
+          { status: 500 }
+        )
       }
       
-      return newUser.id
-    }, 'create-user')
+      userId = newUser.id
+    }
 
-    // Check existing post and create new post in parallel
-    const [existingPostCheck, newPost] = await Promise.all([
-      supabase
-        .from('posts')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('round_id', roundId)
-        .single(),
-      
-      supabase
-        .from('posts')
-        .insert({
-          content,
-          user_id: userId,
-          round_id: roundId
-        })
-        .select()
-        .single()
-    ])
+    // Check existing post
+    const { data: existingPost } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('round_id', roundId)
+      .single()
 
-    // Handle existing post conflict
-    if (existingPostCheck.data) {
+    if (existingPost) {
       return NextResponse.json(
         { error: 'You can only submit one post per round' },
         { status: 400 }
       )
     }
 
-    // Handle post creation error
-    if (newPost.error) {
-      if (newPost.error.code === '23505') { // Unique constraint violation
+    // Create post
+    const { data: newPost, error: postError } = await supabase
+      .from('posts')
+      .insert({
+        content,
+        user_id: userId,
+        round_id: roundId
+      })
+      .select()
+      .single()
+
+    if (postError) {
+      console.error('Post creation error:', postError)
+      if (postError.code === '23505') {
         return NextResponse.json(
           { error: 'You can only submit one post per round' },
           { status: 400 }
         )
       }
-      console.error('Post creation error:', newPost.error)
       return NextResponse.json(
-        { error: 'Failed to create post' },
+        { error: 'Failed to create post: ' + postError.message },
         { status: 500 }
       )
     }
     
     return NextResponse.json({ 
       success: true, 
-      post: newPost.data,
+      post: newPost,
       rateLimit: {
         remaining: rateLimitResult.remaining,
         reset: rateLimitResult.reset
