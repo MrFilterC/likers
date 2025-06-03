@@ -79,36 +79,41 @@ export function WalletButton() {
   if (showWalletList && !connected) {
     return (
       <div className="relative">
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-[var(--card)] rounded-xl p-4 sm:p-6 max-w-xs sm:max-w-sm w-full border border-[var(--border)]">
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--card)] rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm sm:w-auto border-t sm:border border-[var(--border)] max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h3 className="text-base sm:text-lg font-semibold text-[var(--card-foreground)]">
                 Choose Wallet
               </h3>
               <button
                 onClick={() => setShowWalletList(false)}
-                className="p-1 rounded-lg hover:bg-[var(--accent)] text-[var(--foreground)]"
+                className="p-2 rounded-lg hover:bg-[var(--accent)] text-[var(--foreground)] transition-colors"
               >
-                ✕
+                <span className="text-lg">✕</span>
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {wallets.map((wallet) => (
                 <button
                   key={wallet.adapter.name}
                   onClick={() => handleWalletSelect(wallet.adapter.name)}
-                  className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition-colors"
+                  className="w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition-colors text-left"
                 >
                   <img 
                     src={wallet.adapter.icon} 
                     alt={wallet.adapter.name}
-                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0"
                   />
                   <span className="font-medium text-sm sm:text-base text-[var(--card-foreground)]">
                     {wallet.adapter.name}
                   </span>
                 </button>
               ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-[var(--border)] text-center">
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Select a wallet to connect to Likers
+              </p>
             </div>
           </div>
         </div>
