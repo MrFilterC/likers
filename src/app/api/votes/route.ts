@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { checkVoteLimit, recordVote, getClientIP } from '@/lib/ipRateLimit'
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
+import { monitorAsyncOperation } from '@/lib/monitoring'
 
 export async function POST(request: NextRequest) {
   try {
-    const { postId, walletAddress, voteType, roundId } = await request.json()
-    
-    // Get client IP
-    const clientIP = getClientIP(request)
-    
-    // Check IP rate limit
-    if (!checkVoteLimit(clientIP, roundId)) {
+    // Rate limiting check
+    const rateLimitResult = rateLimit(request, RATE_LIMITS.VOTE)
+    if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded: Maximum 5 votes per round per IP address' },
+        { 
+          error: 'Rate limit exceeded',
+          resetTime: rateLimitResult.reset,
+          remaining: rateLimitResult.remaining
+        },
         { status: 429 }
       )
     }
+
+    const { postId, walletAddress, voteType, roundId } = await request.json()
     
     // Validate input
     if (!postId || !walletAddress || !voteType || !roundId) {
@@ -31,122 +34,104 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
-    // Get user ID and post data in parallel for better performance
-    const [userResult, postResult] = await Promise.all([
-      supabase
+
+    // Get or create user with monitoring
+    const userId = await monitorAsyncOperation(async () => {
+      const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('wallet_address', walletAddress)
-        .single(),
-      supabase
-        .from('posts')
-        .select('round_id, user_id')
-        .eq('id', postId)
         .single()
-    ])
 
-    if (!userResult.data) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    if (!postResult.data) {
-      return NextResponse.json(
-        { error: 'Post not found' },
-        { status: 404 }
-      )
-    }
-    
-    const userData = userResult.data
-    const postData = postResult.data
-    
-    if (postData.round_id !== roundId) {
-      return NextResponse.json(
-        { error: 'You can only vote on posts from the current round' },
-        { status: 400 }
-      )
-    }
-    
-    // Check if user is trying to vote on their own post
-    if (postData.user_id === userData.id) {
-      return NextResponse.json(
-        { error: 'You cannot vote on your own post' },
-        { status: 400 }
-      )
-    }
-    
-    // Check existing vote
-    const { data: existingVote } = await supabase
-      .from('votes')
-      .select('*')
-      .eq('post_id', postId)
-      .eq('user_id', userData.id)
-      .maybeSingle() // Use maybeSingle instead of single to handle no results gracefully
-
-    let isNewVote = false
-    
-    if (existingVote) {
-      if (existingVote.vote_type === voteType) {
-        // Remove vote
-        const { error: deleteError } = await supabase
-          .from('votes')
-          .delete()
-          .eq('id', existingVote.id)
-          
-        if (deleteError) {
-          return NextResponse.json(
-            { error: 'Failed to remove vote' },
-            { status: 500 }
-          )
-        }
-      } else {
-        // Update vote
-        const { error: updateError } = await supabase
-          .from('votes')
-          .update({ vote_type: voteType })
-          .eq('id', existingVote.id)
-          
-        if (updateError) {
-          return NextResponse.json(
-            { error: 'Failed to update vote' },
-            { status: 500 }
-          )
-        }
+      if (existingUser) {
+        return existingUser.id
       }
-    } else {
-      // Create new vote
-      const { error: insertError } = await supabase
+
+      const { data: newUser, error: userError } = await supabase
+        .from('users')
+        .insert({ wallet_address: walletAddress })
+        .select('id')
+        .single()
+
+      if (userError) {
+        console.error('User creation error:', userError)
+        throw new Error('Failed to create user')
+      }
+      
+      return newUser.id
+    }, 'create-user-vote')
+
+    // Check for existing vote and create new vote in parallel
+    const [existingVoteCheck, newVote] = await Promise.all([
+      supabase
+        .from('votes')
+        .select('id, vote_type')
+        .eq('post_id', postId)
+        .eq('user_id', userId)
+        .single(),
+      
+      supabase
         .from('votes')
         .insert({
           post_id: postId,
-          user_id: userData.id,
-          vote_type: voteType
+          user_id: userId,
+          vote_type: voteType,
+          round_id: roundId
         })
-        
-      if (insertError) {
+        .select()
+        .single()
+    ])
+
+    // Handle existing vote
+    if (existingVoteCheck.data) {
+      return NextResponse.json(
+        { error: 'You have already voted on this post' },
+        { status: 400 }
+      )
+    }
+
+    // Handle vote creation error
+    if (newVote.error) {
+      if (newVote.error.code === '23505') { // Unique constraint
         return NextResponse.json(
-          { error: 'Failed to create vote' },
-          { status: 500 }
+          { error: 'You have already voted on this post' },
+          { status: 400 }
         )
       }
-      
-      isNewVote = true
+      console.error('Vote creation error:', newVote.error)
+      return NextResponse.json(
+        { error: 'Failed to record vote' },
+        { status: 500 }
+      )
+    }
+
+    // Update post vote counts
+    const updateResult = await monitorAsyncOperation(async () => {
+      if (voteType === 'upvote') {
+        return await supabase.rpc('increment_upvotes', { post_id: postId })
+      } else {
+        return await supabase.rpc('increment_downvotes', { post_id: postId })
+      }
+    }, 'update-vote-count')
+
+    if (updateResult.error) {
+      console.error('Vote count update error:', updateResult.error)
+      // Don't fail the request, just log the error
     }
     
-    // Record IP activity only for new votes (not updates/removals)
-    if (isNewVote) {
-      recordVote(clientIP, roundId)
-    }
-    
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true, 
+      vote: newVote.data,
+      rateLimit: {
+        remaining: rateLimitResult.remaining,
+        reset: rateLimitResult.reset
+      }
+    })
     
   } catch (error) {
-    console.error('Vote error:', error)
+    console.error('Vote creation error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }

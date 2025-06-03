@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { checkPostLimit, recordPost, getClientIP } from '@/lib/ipRateLimit'
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
+import { monitorAsyncOperation } from '@/lib/monitoring'
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, walletAddress, roundId } = await request.json()
-    
-    // Get client IP
-    const clientIP = getClientIP(request)
-    
-    // Check IP rate limit
-    if (!checkPostLimit(clientIP, roundId)) {
+    // Rate limiting check
+    const rateLimitResult = rateLimit(request, RATE_LIMITS.POST)
+    if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded: Maximum 1 post per round per IP address' },
+        { 
+          error: 'Rate limit exceeded',
+          resetTime: rateLimitResult.reset,
+          remaining: rateLimitResult.remaining
+        },
         { status: 429 }
       )
     }
+
+    const { content, walletAddress, roundId } = await request.json()
     
     // Validate input
     if (!content || !walletAddress || !roundId) {
@@ -31,18 +34,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
-    // Get or create user
-    let userId: string
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('wallet_address', walletAddress)
-      .single()
 
-    if (existingUser) {
-      userId = existingUser.id
-    } else {
+    // Get or create user with monitoring
+    const userId = await monitorAsyncOperation(async () => {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', walletAddress)
+        .single()
+
+      if (existingUser) {
+        return existingUser.id
+      }
+
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert({ wallet_address: walletAddress })
@@ -50,62 +54,69 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (userError) {
-        return NextResponse.json(
-          { error: 'Failed to create user' },
-          { status: 500 }
-        )
+        console.error('User creation error:', userError)
+        throw new Error('Failed to create user')
       }
-      userId = newUser.id
-    }
-    
-    // Check if user already posted in this round
-    const { data: existingPost } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('round_id', roundId)
-      .single()
+      
+      return newUser.id
+    }, 'create-user')
 
-    if (existingPost) {
+    // Check existing post and create new post in parallel
+    const [existingPostCheck, newPost] = await Promise.all([
+      supabase
+        .from('posts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('round_id', roundId)
+        .single(),
+      
+      supabase
+        .from('posts')
+        .insert({
+          content,
+          user_id: userId,
+          round_id: roundId
+        })
+        .select()
+        .single()
+    ])
+
+    // Handle existing post conflict
+    if (existingPostCheck.data) {
       return NextResponse.json(
         { error: 'You can only submit one post per round' },
         { status: 400 }
       )
     }
-    
-    // Create post
-    const { data: newPost, error: postError } = await supabase
-      .from('posts')
-      .insert({
-        content,
-        user_id: userId,
-        round_id: roundId
-      })
-      .select()
-      .single()
 
-    if (postError) {
-      if (postError.code === '23505') {
+    // Handle post creation error
+    if (newPost.error) {
+      if (newPost.error.code === '23505') { // Unique constraint violation
         return NextResponse.json(
           { error: 'You can only submit one post per round' },
           { status: 400 }
         )
       }
+      console.error('Post creation error:', newPost.error)
       return NextResponse.json(
         { error: 'Failed to create post' },
         { status: 500 }
       )
     }
     
-    // Record IP activity
-    recordPost(clientIP, roundId)
-    
-    return NextResponse.json({ success: true, post: newPost })
+    return NextResponse.json({ 
+      success: true, 
+      post: newPost.data,
+      rateLimit: {
+        remaining: rateLimitResult.remaining,
+        reset: rateLimitResult.reset
+      }
+    })
     
   } catch (error) {
     console.error('Post creation error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }
