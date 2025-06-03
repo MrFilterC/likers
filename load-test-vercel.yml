@@ -1,0 +1,48 @@
+config:
+  target: 'https://likers.vercel.app'  # Vercel direct - no Cloudflare
+  phases:
+    # 🚀 Light test first  
+    - duration: 60
+      arrivalRate: 5
+      name: "Light load test"
+    
+    # 🔥 Medium load
+    - duration: 60
+      arrivalRate: 15
+      name: "Medium load - 200 users"
+
+  processor: "./load-test-functions.js"
+  
+  defaults:
+    headers:
+      'Content-Type': 'application/json'
+      'User-Agent': 'LoadTest/Artillery'
+
+# 🎮 Simplified scenarios
+scenarios:
+  # 📊 Real user behavior simulation
+  - name: "Active Voter"
+    weight: 80
+    flow:
+      - get:
+          url: "/"
+      - think: 3
+      - function: "generateWalletAddress"
+      - loop:
+        - get:
+            url: "/"
+        - think: 2
+        count: 3
+
+  # 🔄 Page refresher (real-time testing)
+  - name: "Real-time User"
+    weight: 20
+    flow:
+      - get:
+          url: "/"
+      - think: 2
+      - loop:
+        - get:
+            url: "/"
+        - think: 5
+        count: 5 

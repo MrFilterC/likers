@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env.local file.')
@@ -13,20 +13,49 @@ if (supabaseUrl.includes('your-supabase-url') || supabaseAnonKey.includes('your-
 
 // Optimized client for high concurrency
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: {
+    schema: 'public'
+  },
   auth: {
-    persistSession: false, // Disable auth sessions for better performance
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false
   },
   realtime: {
     params: {
-      eventsPerSecond: 50, // Increased event rate for high activity
-    },
+      eventsPerSecond: 50
+    }
   },
   global: {
+    fetch: (...args) => fetch(...args),
     headers: {
-      'Cache-Control': 'no-cache',
-    },
-  },
+      'Connection': 'keep-alive',
+      'Keep-Alive': 'timeout=60'
+    }
+  }
 })
+
+// Connection pool monitoring
+export const createOptimizedClient = () => {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: 'public'
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    },
+    global: {
+      fetch: (...args) => fetch(...args),
+      headers: {
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=60',
+        'Cache-Control': 'no-cache'
+      }
+    }
+  })
+}
 
 export type Database = {
   public: {

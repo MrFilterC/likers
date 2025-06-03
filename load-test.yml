@@ -1,0 +1,113 @@
+config:
+  target: 'https://www.likersapp.com'  # Production domain ile test
+  phases:
+    # 🚀 Phase 1: Warm up (50 users)
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm up phase"
+    
+    # 🔥 Phase 2: Heavy load (200 users)
+    - duration: 120
+      arrivalRate: 10
+      name: "Normal load"
+    
+    # ⚡ Phase 3: Peak load (500 users)
+    - duration: 60
+      arrivalRate: 25
+      name: "Peak load - 500 concurrent users"
+    
+    # 🎯 Phase 4: Stress test (burst)
+    - duration: 30
+      arrivalRate: 50
+      name: "Burst stress test"
+
+  processor: "./load-test-functions.js"
+  
+  defaults:
+    headers:
+      'Content-Type': 'application/json'
+      'User-Agent': 'LoadTest/Artillery'
+
+# 🎮 Test scenarios
+scenarios:
+  # 📊 Real user behavior simulation
+  - name: "Active Voter"
+    weight: 60
+    flow:
+      - get:
+          url: "/"
+      - think: 2
+      - function: "generateWalletAddress"
+      - post:
+          url: "/api/votes"
+          json:
+            postId: "{{ $randomString() }}"
+            walletAddress: "{{ walletAddress }}"
+            voteType: "upvote"
+            roundId: "test-round"
+      - think: 1
+      - post:
+          url: "/api/votes"
+          json:
+            postId: "{{ $randomString() }}"
+            walletAddress: "{{ walletAddress }}"
+            voteType: "downvote"
+            roundId: "test-round"
+      - think: 3
+      - loop:
+        - post:
+            url: "/api/votes"
+            json:
+              postId: "{{ $randomString() }}"
+              walletAddress: "{{ walletAddress }}"
+              voteType: "{{ $randomString() }}"
+              roundId: "test-round"
+        - think: 2
+        count: 5
+
+  # ✍️ Post creator simulation
+  - name: "Content Creator"
+    weight: 20
+    flow:
+      - get:
+          url: "/"
+      - think: 3
+      - function: "generateWalletAddress"
+      - post:
+          url: "/api/posts"
+          json:
+            content: "Test post from load testing {{ $randomString() }}"
+            walletAddress: "{{ walletAddress }}"
+            roundId: "test-round"
+      - think: 5
+      - loop:
+        - post:
+            url: "/api/votes"
+            json:
+              postId: "{{ $randomString() }}"
+              walletAddress: "{{ walletAddress }}"
+              voteType: "upvote"
+              roundId: "test-round"
+        - think: 1
+        count: 3
+
+  # 🔄 Page refresher (real-time testing)
+  - name: "Real-time User"
+    weight: 20
+    flow:
+      - get:
+          url: "/"
+      - think: 2
+      - loop:
+        - get:
+            url: "/"
+        - think: 5
+        count: 10
+
+# 📈 Performance thresholds
+ensure:
+  # API response times
+  - http.response_time.p95: 2000  # 95% of requests under 2s
+  - http.response_time.p99: 5000  # 99% of requests under 5s
+  - http.codes.200: 90           # 90% success rate minimum
+  - http.codes.500: 5            # Max 5% server errors 
