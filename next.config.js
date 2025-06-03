@@ -15,7 +15,7 @@ const nextConfig = {
   },
   // Performance optimizations for high concurrency
   experimental: {
-    optimizeCss: true,
+    // optimizeCss removed - causing critters module error
   },
   // External packages for server components (moved from experimental)
   serverExternalPackages: ['@supabase/supabase-js'],
