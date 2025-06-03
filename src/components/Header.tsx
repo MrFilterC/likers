@@ -48,7 +48,7 @@ export function Header({ onlineUsers = 0, connectionStatus = 'connecting' }: Hea
             className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--muted)] text-[var(--accent-foreground)] transition-colors flex-shrink-0"
           >
             <HelpCircle size={12} className="sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">Help</span>
+            <span className="text-xs sm:text-sm">How it works</span>
           </button>
 
           {/* Right side - Theme toggle + Status + Wallet */}
