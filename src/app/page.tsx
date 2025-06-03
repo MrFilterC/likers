@@ -650,98 +650,37 @@ export default function Home() {
         }
       }
 
-      // Server-side preparation check: Verify round is still active and not in preparation
-      const { data: roundData, error: roundError } = await supabase
-        .from('rounds')
-        .select('end_time, is_active, server_ended')
-        .eq('id', currentRoundId)
-        .single()
-
-      if (roundError || !roundData) {
-        alert('Round not found. Please refresh the page.')
-        return
-      }
-
-      if (!roundData.is_active || roundData.server_ended) {
-        alert('This round is no longer active. Please wait for the next round.')
-        // Trigger round update
-        await getCurrentRound()
-        return
-      }
-
-      const roundEndTime = new Date(roundData.end_time)
-      const now = new Date()
-      const timeUntilEnd = roundEndTime.getTime() - now.getTime()
-
-      // If round ended (even if still active for preparation phase)
-      if (timeUntilEnd <= 0) {
-        alert('Round has ended. Please wait for the next round.')
-        // Trigger round update to sync preparation mode
-        await getCurrentRound()
-        return
-      }
-
-      // Check client-side preparation mode as secondary check
+      // Check client-side preparation mode
       if (preparationMode) {
         alert('Cannot submit posts during preparation phase!')
         return
       }
 
-      // Get or create user
-      let userId: string
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', publicKey.toString())
-        .single()
+      // Call API route
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          walletAddress: publicKey.toString(),
+          roundId: currentRoundId
+        })
+      })
 
-      if (existingUser) {
-        userId = existingUser.id
-      } else {
-        const { data: newUser, error: userError } = await supabase
-          .from('users')
-          .insert({ wallet_address: publicKey.toString() })
-          .select('id')
-          .single()
+      const result = await response.json()
 
-        if (userError) throw userError
-        userId = newUser.id
-      }
-
-      // Check if user already posted in this round (this will be enforced by database constraint)
-      const { data: existingPost } = await supabase
-        .from('posts')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('round_id', currentRoundId)
-        .single()
-
-      if (existingPost) {
-        alert('You can only submit one post per round! Wait for the next round.')
+      if (!response.ok) {
+        if (response.status === 429) {
+          alert('Rate limit exceeded: Maximum 1 post per round per IP address')
+        } else {
+          alert(result.error || 'Failed to submit post. Please try again.')
+        }
         return
       }
 
-      // Create post
-      const { data: newPost, error: postError } = await supabase
-        .from('posts')
-        .insert({
-          content,
-          user_id: userId,
-          round_id: currentRoundId
-        })
-        .select()
-        .single()
-
-      if (postError) {
-        // Handle constraint violations
-        if (postError.code === '23505') { // Unique constraint violation
-          alert('You can only submit one post per round!')
-          return
-        }
-        throw postError
-      }
-
-      // Reload posts
+      // Reload posts on success
       await loadPosts()
     } catch (error) {
       logger.error('Error submitting post:', error)
@@ -771,68 +710,37 @@ export default function Home() {
         return
       }
 
-      // Simple check: only allow voting on posts from current round
-      const { data: postData, error: postError } = await supabase
-        .from('posts')
-        .select('round_id')
-        .eq('id', postId)
-        .single()
-
-      if (postError || !postData) {
-        alert('Post not found. Please refresh the page.')
+      if (!currentRoundId) {
+        alert('No active round found. Please refresh the page.')
         return
       }
 
-      // If post is not from current round, don't allow voting
-      if (postData.round_id !== currentRoundId) {
-        alert('You can only vote on posts from the current round.')
-        await getCurrentRound() // Sync round state
-        return
-      }
+      // Call API route
+      const response = await fetch('/api/votes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          postId,
+          walletAddress: publicKey.toString(),
+          voteType,
+          roundId: currentRoundId
+        })
+      })
 
-      // Get user ID
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', publicKey.toString())
-        .single()
+      const result = await response.json()
 
-      if (!userData) return
-
-      // Check existing vote
-      const { data: existingVote } = await supabase
-        .from('votes')
-        .select('*')
-        .eq('post_id', postId)
-        .eq('user_id', userData.id)
-        .single()
-
-      if (existingVote) {
-        if (existingVote.vote_type === voteType) {
-          // Remove vote
-          await supabase
-            .from('votes')
-            .delete()
-            .eq('id', existingVote.id)
+      if (!response.ok) {
+        if (response.status === 429) {
+          alert('Rate limit exceeded: Maximum 5 votes per round per IP address')
         } else {
-          // Update vote
-          await supabase
-            .from('votes')
-            .update({ vote_type: voteType })
-            .eq('id', existingVote.id)
+          alert(result.error || 'Failed to vote. Please try again.')
         }
-      } else {
-        // Create new vote
-        await supabase
-          .from('votes')
-          .insert({
-            post_id: postId,
-            user_id: userData.id,
-            vote_type: voteType
-          })
+        return
       }
 
-      // Reload posts
+      // Reload posts on success
       await loadPosts()
     } catch (error) {
       logger.error('Error voting:', error)
