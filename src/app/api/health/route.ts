@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
@@ -10,34 +9,55 @@ export async function GET() {
       nodeEnv: process.env.NODE_ENV
     })
 
-    // Test database connection with more specific query
-    const { data, error, count } = await supabase
-      .from('rounds')
-      .select('id', { count: 'exact' })
-      .limit(1)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    if (error) {
-      console.error('❌ Supabase Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      })
-      
+    if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
         { 
           status: 'error', 
-          message: 'Database connection failed',
-          error: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
+          message: 'Environment variables missing',
+          supabaseUrl: supabaseUrl ? 'SET' : 'MISSING',
+          supabaseKey: supabaseKey ? 'SET' : 'MISSING'
         },
         { status: 500 }
       )
     }
 
-    console.log('✅ Database connected successfully:', { data, count })
+    // Test direct HTTP connection to Supabase
+    const response = await fetch(`${supabaseUrl}/rest/v1/rounds?select=id&limit=1`, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('🌐 Direct fetch response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Supabase HTTP Error:', errorText)
+      
+      return NextResponse.json(
+        { 
+          status: 'error', 
+          message: 'Direct HTTP connection failed',
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          error: errorText
+        },
+        { status: 500 }
+      )
+    }
+
+    const data = await response.json()
+    console.log('✅ Direct HTTP connection successful:', data)
 
     // Test successful
     return NextResponse.json({
@@ -45,7 +65,8 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       database: 'connected',
       uptime: process.uptime(),
-      roundsCount: count || 0
+      connectionType: 'direct-http',
+      data: data
     })
 
   } catch (error) {
